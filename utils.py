@@ -46,13 +46,14 @@ def get_sheet_names():
         return ['Data']
     else:
         # Pour Excel, retourner les noms réels des feuilles
-        xls = pd.ExcelFile(DATA_FILE)
-        return xls.sheet_names
+        with pd.ExcelFile(DATA_FILE) as xls:
+            return xls.sheet_names
 
 
 def hex_to_rgba(hex_color, alpha=1.0):
     """
-    Convertit une couleur hexadécimale en format rgba string
+    Convertit une couleur hexadécimale en format rgba string.
+    Valide les entrées et lève des exceptions en cas d'erreur.
     
     Args:
         hex_color (str): Couleur hexadécimale (e.g., '#114B80' ou '114B80')
@@ -64,17 +65,23 @@ def hex_to_rgba(hex_color, alpha=1.0):
     Raises:
         ValueError: Si alpha n'est pas entre 0.0 et 1.0 ou si le format hex est invalide
     """
+    # Validation de l'alpha
     if not 0.0 <= alpha <= 1.0:
         raise ValueError(f"Alpha value must be between 0.0 and 1.0, got {alpha}")
+    
+    # Nettoyage et validation du format hex
     hex_color = hex_color.lstrip('#')
     if len(hex_color) != 6:
         raise ValueError(f"Invalid hex color format: {hex_color}. Expected 6-character hex string.")
+    
+    # Conversion hex vers RGB
     try:
         r = int(hex_color[0:2], 16)
         g = int(hex_color[2:4], 16)
         b = int(hex_color[4:6], 16)
     except ValueError:
         raise ValueError(f"Invalid hex color format: {hex_color}. Could not parse hex values.")
+    
     return f'rgba({r}, {g}, {b}, {alpha})'
 
 
@@ -137,6 +144,8 @@ def calculate_annualized_return(returns, periods_per_year=252):
     Args:
         returns (pd.Series): Série de rendements
         periods_per_year (int): Nombre de périodes par an (252 pour jours de trading)
+            Note: Ce paramètre doit correspondre à la fréquence des données.
+            Utiliser 252 pour données quotidiennes, 12 pour mensuelles, etc.
         
     Returns:
         float: Rendement annualisé en pourcentage
@@ -154,6 +163,8 @@ def calculate_volatility(returns, periods_per_year=252):
     Args:
         returns (pd.Series): Série de rendements
         periods_per_year (int): Nombre de périodes par an
+            Note: Ce paramètre doit correspondre à la fréquence des données.
+            Utiliser 252 pour données quotidiennes, 12 pour mensuelles, etc.
         
     Returns:
         float: Volatilité annualisée en pourcentage
@@ -198,7 +209,8 @@ def calculate_max_drawdown(prices):
     if len(prices) == 0:
         return 0
     
-    cumulative_returns = (1 + prices.pct_change()).cumprod()
+    # Calculer les rendements cumulés en gérant les NaN
+    cumulative_returns = (1 + prices.pct_change().fillna(0)).cumprod()
     running_max = cumulative_returns.expanding().max()
     drawdown = (cumulative_returns - running_max) / running_max * 100
     

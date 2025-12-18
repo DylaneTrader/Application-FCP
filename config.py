@@ -43,6 +43,8 @@ COMMON_CSS = f"""
         border-radius: 3px;
         border-left: 2px solid {PRIMARY_COLOR};
     }}
+    /* Note: .css-1d391kg is a Streamlit internal class that may change between versions.
+       Using [data-testid] selectors is more stable. Keep both for compatibility. */
     .css-1d391kg, [data-testid="stSidebar"] {{
         background-color: #f8f9fa;
     }}
