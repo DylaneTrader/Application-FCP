@@ -2,7 +2,7 @@
 Souscriptions et Rachats Analysis Page
 Analyzes subscriptions and redemptions for FCP funds
 """
-
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
