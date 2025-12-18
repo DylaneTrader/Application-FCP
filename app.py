@@ -1,19 +1,11 @@
 import streamlit as st
 import pandas as pd
 import os
-
-# Constants
-DATA_FILE = os.getenv('FCP_DATA_FILE', 'data_fcp.xlsx')
-DEFAULT_SHEET_NAME = 'Valeurs Liquidatives'  # Default sheet for data loading
-
-# Detect file type
-FILE_EXTENSION = os.path.splitext(DATA_FILE)[1].lower()
-IS_CSV = FILE_EXTENSION == '.csv'
-
-# Color Scheme
-PRIMARY_COLOR = "#114B80"    # Bleu profond — titres, boutons principaux
-SECONDARY_COLOR = "#567389"  # Bleu-gris — widgets, lignes, icônes
-ACCENT_COLOR = "#ACC7DF"     # Bleu clair — fonds de cartes, hover
+from config import (
+    DATA_FILE, DEFAULT_SHEET_NAME, IS_CSV, 
+    PRIMARY_COLOR, SECONDARY_COLOR, ACCENT_COLOR
+)
+from utils import load_data, get_sheet_names
 
 # Configuration de la page
 st.set_page_config(
@@ -23,68 +15,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS pour améliorer l'esthétique
-st.markdown(f"""
-<style>
-    .main-header {{
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: {PRIMARY_COLOR};
-        text-align: center;
-        margin-bottom: 1rem;
-    }}
-    .metric-card {{
-        background-color: #f8f9fa;
-        padding: 0.3rem;
-        border-radius: 3px;
-        border-left: 2px solid {PRIMARY_COLOR};
-    }}
-    /* Sidebar styling */
-    .css-1d391kg, [data-testid="stSidebar"] {{
-        background-color: #f8f9fa;
-    }}
-    /* Better spacing for metrics */
-    [data-testid="stMetricValue"] {{
-        font-size: 1.5rem;
-        font-weight: bold;
-    }}
-    .page-card {{
-        background-color: #ffffff;
-        padding: 0.5rem;
-        border-radius: 3px;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        margin-bottom: 0.3rem;
-        border-left: 2px solid {PRIMARY_COLOR};
-    }}
-</style>
-""", unsafe_allow_html=True)
-
-# Chargement des données
-@st.cache_data
-def load_data(sheet_name=DEFAULT_SHEET_NAME):
-    """Charge les données du fichier CSV ou Excel"""
-    if IS_CSV:
-        # Pour CSV, charger directement (pas de notion de feuilles)
-        df = pd.read_csv(DATA_FILE)
-    else:
-        # Pour Excel, charger la feuille spécifiée
-        df = pd.read_excel(DATA_FILE, sheet_name=sheet_name)
-    
-    if 'Date' in df.columns:
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        df = df.sort_values('Date')
-    return df
-
-@st.cache_data
-def get_sheet_names():
-    """Récupère la liste des feuilles disponibles dans le fichier Excel (ou nom par défaut pour CSV)"""
-    if IS_CSV:
-        # Pour CSV, retourner un nom de feuille par défaut
-        return ['Data']
-    else:
-        # Pour Excel, retourner les noms réels des feuilles
-        xls = pd.ExcelFile(DATA_FILE)
-        return xls.sheet_names
+# Custom CSS
+from config import COMMON_CSS
+st.markdown(COMMON_CSS, unsafe_allow_html=True)
 
 # Application principale
 def main():
