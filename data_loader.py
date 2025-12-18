@@ -1,7 +1,7 @@
 import pandas as pd
 
 # (lien de téléchargement direct)
-url = "C:\\Users\\DYLANE\\Downloads\\PTF OPCVM CGF GESTION.xlsx"
+url = "https://boursecgf.sharepoint.com/:x:/r/sites/CGF_GESTION/_layouts/15/Doc.aspx?sourcedoc=%7BBB0CA8B9-241C-42A5-95FE-B52CA4DFC9B7%7D&file=MY%20PTF%20OPCVM.xlsm&action=default&mobileredirect=true"
 
 # Lecture du fichier
 data_vl = pd.read_excel(
