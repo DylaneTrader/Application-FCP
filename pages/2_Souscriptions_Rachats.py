@@ -2,7 +2,7 @@
 Souscriptions et Rachats Analysis Page
 Analyzes subscriptions and redemptions for FCP funds
 """
-
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -593,7 +593,7 @@ def main():
                 key="client_types_analysis"
             )
         with col2:
-            compare_clients = st.checkbox("Comparer au Total", value=True, key="compare_clients_total")
+            compare_clients = st.checkbox("Comparer au Total", value=False, key="compare_clients_total")
         
         if not selected_client_types_analysis:
             st.warning("⚠️ Veuillez sélectionner au moins un type de client")
