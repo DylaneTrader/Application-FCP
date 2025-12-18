@@ -17,6 +17,12 @@ import os
 TRADING_DAYS_PER_YEAR = 252
 DATA_FILE = os.getenv('FCP_DATA_FILE', 'data_fcp.xlsx')
 
+# Risk Fingerprint Normalization Constants
+# For skewness normalization: transforms skewness values to [0, 100] scale
+# Positive skewness (right tail) maps to [50, 100], negative to [0, 50]
+SKEWNESS_SCALE_FACTOR = 25  # Scaling factor for skewness transformation
+SKEWNESS_NEUTRAL_SCORE = 50  # Score for zero skewness (neutral distribution)
+
 # Color Scheme
 PRIMARY_COLOR = "#114B80"    # Bleu profond — titres, boutons principaux
 SECONDARY_COLOR = "#567389"  # Bleu-gris — widgets, lignes, icônes
@@ -909,9 +915,11 @@ def calculate_7d_risk_profile(df, fcp_name):
     # 3. Récupération (inverse du temps de récupération moyen)
     episodes_with_recovery = [ep for ep in dd_analysis['drawdown_episodes'] 
                              if ep['recovery_time'] is not None]
+    # Use minimum meaningful recovery time (1 day) if no recovery episodes exist
+    # This prevents division by zero and represents "instant recovery" scenario
     avg_recovery_time = np.mean([ep['recovery_time'] for ep in episodes_with_recovery]) \
-                       if episodes_with_recovery else 0
-    recuperation = avg_recovery_time if avg_recovery_time > 0 else 1  # Sera inversé lors de la normalisation
+                       if episodes_with_recovery else 1
+    recuperation = avg_recovery_time  # Sera inversé lors de la normalisation
     
     # 4. Protection Extrême (inverse de la CVaR)
     var_95 = np.percentile(returns, 5)
@@ -982,12 +990,13 @@ def normalize_7d_risk_profile(profiles_dict):
             # Traitement spécial pour l'asymétrie (skewness)
             if dimension == 'Asymétrie':
                 # Convertir de [-inf, +inf] vers [0, 100]
-                # Skewness positif (queues à droite) = mieux
-                # On utilise une transformation sigmoïde pour mapper vers [0, 100]
+                # Skewness positif (queues à droite) = mieux, maps to [50, 100]
+                # Skewness négatif (queues à gauche) = moins bien, maps to [0, 50]
+                # Utilise SKEWNESS_SCALE_FACTOR pour la transformation linéaire
                 if value >= 0:
-                    norm_value = 50 + min(value * 25, 50)  # Positive skewness maps to [50, 100]
+                    norm_value = SKEWNESS_NEUTRAL_SCORE + min(value * SKEWNESS_SCALE_FACTOR, SKEWNESS_NEUTRAL_SCORE)
                 else:
-                    norm_value = 50 + max(value * 25, -50)  # Negative skewness maps to [0, 50]
+                    norm_value = SKEWNESS_NEUTRAL_SCORE + max(value * SKEWNESS_SCALE_FACTOR, -SKEWNESS_NEUTRAL_SCORE)
             
             normalized[fcp_name][dimension] = norm_value
     
