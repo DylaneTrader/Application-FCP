@@ -875,6 +875,179 @@ def normalize_risk_fingerprint(fingerprints_dict):
     return normalized
 
 
+def calculate_7d_risk_profile(df, fcp_name):
+    """
+    Calcule le profil de risque sur 7 dimensions pour le Risk Fingerprint.
+    
+    Les 7 dimensions sont:
+    a. Stabilité: Inverse de la volatilité (plus haut = plus stable)
+    b. Résilience: Inverse du max drawdown (plus haut = plus résilient)
+    c. Récupération: Inverse du temps de récupération moyen
+    d. Protection Extrême: Inverse de la CVaR (plus haut = mieux protégé)
+    e. Asymétrie: Skewness normalisée (plus haut = meilleure asymétrie)
+    f. Sharpe Stable: Stabilité du ratio de Sharpe dans le temps
+    g. Pain Ratio: Rendement ajusté à la douleur
+    
+    Args:
+        df: DataFrame avec les valeurs liquidatives
+        fcp_name: Nom du FCP
+    
+    Returns:
+        dict: Les 7 dimensions avec leurs valeurs brutes
+    """
+    # Calcul des métriques de base
+    returns = df[fcp_name].pct_change().dropna() * 100
+    
+    # 1. Stabilité (inverse de la volatilité)
+    volatility = returns.std()
+    stabilite = volatility  # Sera inversé lors de la normalisation
+    
+    # 2. Résilience (inverse du max drawdown)
+    dd_analysis = analyze_drawdowns(df, fcp_name)
+    resilience = abs(dd_analysis['max_drawdown'])  # Sera inversé lors de la normalisation
+    
+    # 3. Récupération (inverse du temps de récupération moyen)
+    episodes_with_recovery = [ep for ep in dd_analysis['drawdown_episodes'] 
+                             if ep['recovery_time'] is not None]
+    avg_recovery_time = np.mean([ep['recovery_time'] for ep in episodes_with_recovery]) \
+                       if episodes_with_recovery else 0
+    recuperation = avg_recovery_time if avg_recovery_time > 0 else 1  # Sera inversé lors de la normalisation
+    
+    # 4. Protection Extrême (inverse de la CVaR)
+    var_95 = np.percentile(returns, 5)
+    cvar_95 = returns[returns <= var_95].mean()
+    protection_extreme = abs(cvar_95)  # Sera inversé lors de la normalisation
+    
+    # 5. Asymétrie (skewness normalisée)
+    skewness = stats.skew(returns)
+    asymetrie = skewness  # Sera traité spécialement lors de la normalisation
+    
+    # 6. Sharpe Stable (stabilité du ratio de Sharpe)
+    rolling_risk = calculate_rolling_risk_indicators(df, fcp_name, window=60)
+    sharpe_stability = rolling_risk['Rolling_Sharpe'].std()
+    sharpe_stable = sharpe_stability  # Sera inversé lors de la normalisation
+    
+    # 7. Pain Ratio (rendement ajusté à la douleur)
+    pain_ratio = dd_analysis['pain_ratio']
+    
+    return {
+        'Stabilité': stabilite,
+        'Résilience': resilience,
+        'Récupération': recuperation,
+        'Protection Extrême': protection_extreme,
+        'Asymétrie': asymetrie,
+        'Sharpe Stable': sharpe_stable,
+        'Pain Ratio': pain_ratio
+    }
+
+
+def normalize_7d_risk_profile(profiles_dict):
+    """
+    Normalise les profils de risque 7D pour comparaison entre FCP.
+    Score normalisé = (Valeur - Min) / (Max - Min) × 100
+    
+    Args:
+        profiles_dict: Dict avec {fcp_name: profile_7d}
+    
+    Returns:
+        dict: Profils normalisés [0-100]
+    """
+    if not profiles_dict:
+        return {}
+    
+    # Dimensions à inverser (moins c'est mieux)
+    inverse_dimensions = ['Stabilité', 'Résilience', 'Récupération', 'Protection Extrême', 'Sharpe Stable']
+    
+    normalized = {}
+    
+    for fcp_name, profile in profiles_dict.items():
+        normalized[fcp_name] = {}
+        
+        for dimension, value in profile.items():
+            # Collecter toutes les valeurs pour cette dimension
+            all_values = [p[dimension] for p in profiles_dict.values()]
+            min_val = min(all_values)
+            max_val = max(all_values)
+            
+            # Normalisation [0-100]
+            if max_val > min_val:
+                norm_value = ((value - min_val) / (max_val - min_val)) * 100
+            else:
+                norm_value = 50  # Valeur médiane si tous égaux
+            
+            # Inverser pour les dimensions "moins c'est mieux"
+            if dimension in inverse_dimensions:
+                norm_value = 100 - norm_value
+            
+            # Traitement spécial pour l'asymétrie (skewness)
+            if dimension == 'Asymétrie':
+                # Convertir de [-inf, +inf] vers [0, 100]
+                # Skewness positif (queues à droite) = mieux
+                # On utilise une transformation sigmoïde pour mapper vers [0, 100]
+                if value >= 0:
+                    norm_value = 50 + min(value * 25, 50)  # Positive skewness maps to [50, 100]
+                else:
+                    norm_value = 50 + max(value * 25, -50)  # Negative skewness maps to [0, 50]
+            
+            normalized[fcp_name][dimension] = norm_value
+    
+    return normalized
+
+
+def create_risk_fingerprint_chart(normalized_profile, fcp_name):
+    """
+    Crée un radar chart (spider chart) pour le Risk Fingerprint.
+    
+    Args:
+        normalized_profile: Dict avec les 7 dimensions normalisées [0-100]
+        fcp_name: Nom du FCP
+    
+    Returns:
+        plotly.graph_objects.Figure: Le radar chart
+    """
+    dimensions = list(normalized_profile.keys())
+    values = list(normalized_profile.values())
+    
+    # Fermer le radar chart en ajoutant la première valeur à la fin
+    dimensions_closed = dimensions + [dimensions[0]]
+    values_closed = values + [values[0]]
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatterpolar(
+        r=values_closed,
+        theta=dimensions_closed,
+        fill='toself',
+        fillcolor=hex_to_rgba(PRIMARY_COLOR, 0.3),
+        line=dict(color=PRIMARY_COLOR, width=2),
+        name=fcp_name,
+        hovertemplate='<b>%{theta}</b><br>Score: %{r:.1f}/100<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 100],
+                tickmode='linear',
+                tick0=0,
+                dtick=20,
+                showticklabels=True,
+                ticks='outside'
+            ),
+            angularaxis=dict(
+                direction='clockwise'
+            )
+        ),
+        showlegend=True,
+        title=f"Risk Fingerprint - {fcp_name}",
+        height=500,
+        template="plotly_white"
+    )
+    
+    return fig
+
+
 @st.cache_data
 def load_data():
     """Charge les données du fichier CSV ou Excel"""
@@ -1578,6 +1751,153 @@ la plus faible à **{worst_fcp['Performance (%)']:+.2f}%**. La performance moyen
             )
             
             # ========================================
+            # RISK FINGERPRINT - PROFIL DE RISQUE 7D
+            # ========================================
+            st.markdown("---")
+            st.markdown("### 🎯 Risk Fingerprint - Profil de Risque Multidimensionnel")
+            
+            st.markdown("""
+            <div class="insight-box">
+                <h4>📊 Représentation du Profil de Risque sur 7 Dimensions</h4>
+                <p>Le <strong>Risk Fingerprint</strong> offre une représentation multidimensionnelle du profil de risque 
+                sur 7 dimensions normalisées (0-100). Cette visualisation permet d'identifier rapidement les forces et 
+                faiblesses du fonds en matière de gestion du risque.</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Calculer le profil 7D pour tous les FCPs sélectionnés
+            profiles_7d = {}
+            for fcp in selected_fcps:
+                try:
+                    profiles_7d[fcp] = calculate_7d_risk_profile(full_df, fcp)
+                except Exception as e:
+                    st.warning(f"⚠️ Impossible de calculer le profil pour {fcp}: {str(e)}")
+            
+            if profiles_7d:
+                # Normaliser les profils
+                normalized_profiles = normalize_7d_risk_profile(profiles_7d)
+                
+                # Afficher le radar chart pour le FCP principal
+                if main_fcp in normalized_profiles:
+                    col1, col2 = st.columns([2, 1])
+                    
+                    with col1:
+                        # Créer et afficher le radar chart
+                        fig_radar = create_risk_fingerprint_chart(normalized_profiles[main_fcp], main_fcp)
+                        st.plotly_chart(fig_radar, use_container_width=True)
+                    
+                    with col2:
+                        st.markdown("##### 📋 Scores par Dimension")
+                        
+                        # Tableau des scores
+                        scores_data = []
+                        for dimension, score in normalized_profiles[main_fcp].items():
+                            scores_data.append({
+                                'Dimension': dimension,
+                                'Score': f"{score:.1f}/100"
+                            })
+                        
+                        scores_df = pd.DataFrame(scores_data)
+                        st.dataframe(scores_df, use_container_width=True, hide_index=True)
+                        
+                        # Score global
+                        global_score = np.mean(list(normalized_profiles[main_fcp].values()))
+                        
+                        # Déterminer le niveau de risque
+                        if global_score >= 70:
+                            risk_level = "Excellent"
+                            risk_color = "#28a745"
+                        elif global_score >= 50:
+                            risk_level = "Bon"
+                            risk_color = "#ffc107"
+                        else:
+                            risk_level = "À Surveiller"
+                            risk_color = "#dc3545"
+                        
+                        st.markdown(f"""
+                        <div style="background-color: {risk_color}15; border-left: 4px solid {risk_color}; 
+                                    padding: 1rem; border-radius: 5px; margin-top: 1rem;">
+                            <div style="font-size: 0.9rem; font-weight: bold; margin-bottom: 0.5rem;">Score Global</div>
+                            <div style="font-size: 2rem; font-weight: bold; color: {risk_color};">{global_score:.1f}/100</div>
+                            <div style="font-size: 1rem; margin-top: 0.3rem;">{risk_level}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                
+                # Explication des 7 dimensions
+                with st.expander("ℹ️ Explication des 7 Dimensions du Risk Fingerprint"):
+                    st.markdown("""
+                    Le Risk Fingerprint analyse le profil de risque du fonds sur 7 dimensions clés :
+                    
+                    1. **Stabilité** : Inverse de la volatilité. Un score élevé indique des rendements stables et prévisibles.
+                    
+                    2. **Résilience** : Inverse du drawdown maximum. Un score élevé montre une forte capacité à limiter les pertes en période adverse.
+                    
+                    3. **Récupération** : Inverse du temps de récupération moyen après un drawdown. Un score élevé indique une capacité rapide à retrouver les niveaux précédents.
+                    
+                    4. **Protection Extrême** : Inverse de la CVaR (Conditional Value at Risk). Un score élevé signifie une meilleure protection contre les pertes extrêmes.
+                    
+                    5. **Asymétrie** : Skewness normalisée. Un score élevé indique une distribution favorable avec plus de gains extrêmes que de pertes extrêmes.
+                    
+                    6. **Sharpe Stable** : Stabilité du ratio de Sharpe dans le temps. Un score élevé montre un rendement ajusté au risque constant et fiable.
+                    
+                    7. **Pain Ratio** : Rendement ajusté à la "douleur" (Ulcer Index). Un score élevé indique que les rendements compensent bien l'inconfort des drawdowns.
+                    
+                    **Normalisation** : Toutes les dimensions sont normalisées sur une échelle de 0 à 100 selon la formule :
+                    `Score = (Valeur - Min) / (Max - Min) × 100`
+                    
+                    Cette normalisation permet de comparer les fonds sur une échelle commune, indépendamment des unités de mesure d'origine.
+                    """)
+                
+                # Comparaison multi-FCP si plusieurs FCP sélectionnés
+                if len(selected_fcps) > 1:
+                    st.markdown("---")
+                    st.markdown("##### 📊 Comparaison des Profils de Risque")
+                    
+                    # Créer un tableau comparatif
+                    comparison_data = []
+                    for fcp_name, profile in normalized_profiles.items():
+                        row = {'FCP': fcp_name}
+                        row.update({dim: f"{score:.1f}" for dim, score in profile.items()})
+                        row['Score Global'] = f"{np.mean(list(profile.values())):.1f}"
+                        comparison_data.append(row)
+                    
+                    comparison_df = pd.DataFrame(comparison_data)
+                    st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+                    
+                    # Identifier les meilleurs et moins bons sur chaque dimension
+                    st.markdown("##### 🏆 Forces et Faiblesses par Dimension")
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown("**Top Performers par Dimension**")
+                        best_performers = []
+                        for dimension in normalized_profiles[main_fcp].keys():
+                            best_fcp = max(normalized_profiles.items(), key=lambda x: x[1][dimension])
+                            best_performers.append({
+                                'Dimension': dimension,
+                                'FCP': best_fcp[0],
+                                'Score': f"{best_fcp[1][dimension]:.1f}"
+                            })
+                        
+                        best_df = pd.DataFrame(best_performers)
+                        st.dataframe(best_df, use_container_width=True, hide_index=True)
+                    
+                    with col2:
+                        st.markdown("**Points d'Attention par Dimension**")
+                        worst_performers = []
+                        for dimension in normalized_profiles[main_fcp].keys():
+                            worst_fcp = min(normalized_profiles.items(), key=lambda x: x[1][dimension])
+                            worst_performers.append({
+                                'Dimension': dimension,
+                                'FCP': worst_fcp[0],
+                                'Score': f"{worst_fcp[1][dimension]:.1f}"
+                            })
+                        
+                        worst_df = pd.DataFrame(worst_performers)
+                        st.dataframe(worst_df, use_container_width=True, hide_index=True)
+            
+            # ========================================
             # 1. RISQUE DANS LE TEMPS - DRAWDOWNS
             # ========================================
             st.markdown("---")
@@ -1687,6 +2007,14 @@ la plus faible à **{worst_fcp['Performance (%)']:+.2f}%**. La performance moyen
         </div>
         """, unsafe_allow_html=True)
         
+        st.markdown("""
+        <div class="interpretation-note">
+            <strong>💡 Note Importante:</strong> Cette analyse de volatilité utilise <strong>toute l'historique disponible</strong>, 
+            indépendamment du filtre de période sélectionné dans la barre latérale. Cela permet d'avoir une vue complète 
+            des régimes de volatilité sur toute la durée de vie du fonds.
+        </div>
+        """, unsafe_allow_html=True)
+        
         # Sélection d'un FCP pour l'analyse
         if len(selected_fcps) > 0:
             fcp_for_analysis = st.selectbox(
@@ -1695,8 +2023,8 @@ la plus faible à **{worst_fcp['Performance (%)']:+.2f}%**. La performance moyen
                 key="regime_analysis_fcp"
             )
             
-            # Analyse des régimes de volatilité
-            regime_analysis = analyze_volatility_regimes(filtered_df, fcp_for_analysis, window=30)
+            # Analyse des régimes de volatilité - UTILISE TOUTE L'HISTORIQUE
+            regime_analysis = analyze_volatility_regimes(full_df, fcp_for_analysis, window=30)
             
             st.markdown("---")
             st.markdown("### 📋 Synthèse Exécutive")
