@@ -5,7 +5,7 @@ Contient les fonctions de chargement de données et de conversion
 import pandas as pd
 import numpy as np
 import streamlit as st
-from config import DATA_FILE, IS_CSV, DEFAULT_SHEET_NAME, PRIMARY_COLOR
+from config import DATA_FILE, IS_CSV, DEFAULT_SHEET_NAME
 
 
 @st.cache_data

@@ -14,7 +14,7 @@ from scipy import stats
 
 # Import centralized configuration and utilities
 from config import (
-    TRADING_DAYS_PER_YEAR, DATA_FILE, 
+    TRADING_DAYS_PER_YEAR, DATA_FILE, DEFAULT_SHEET_NAME,
     PRIMARY_COLOR, SECONDARY_COLOR, ACCENT_COLOR,
     COMMON_CSS
 )
@@ -800,7 +800,7 @@ def main():
     
     # Load data
     with st.spinner('Chargement des données...'):
-        df = load_data('Valeurs Liquidatives')
+        df = load_data(DEFAULT_SHEET_NAME)
     
     # Obtenir la liste des FCP
     fcp_cols = [col for col in df.columns if col != 'Date']
