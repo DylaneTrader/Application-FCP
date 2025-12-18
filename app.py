@@ -6,10 +6,6 @@ import os
 DATA_FILE = os.getenv('FCP_DATA_FILE', 'data_fcp.xlsx')
 DEFAULT_SHEET_NAME = 'Valeurs Liquidatives'  # Default sheet for data loading
 
-# Detect file type
-FILE_EXTENSION = os.path.splitext(DATA_FILE)[1].lower()
-IS_CSV = FILE_EXTENSION == '.csv'
-
 # Color Scheme
 PRIMARY_COLOR = "#114B80"    # Bleu profond — titres, boutons principaux
 SECONDARY_COLOR = "#567389"  # Bleu-gris — widgets, lignes, icônes
@@ -62,29 +58,18 @@ st.markdown(f"""
 # Chargement des données
 @st.cache_data
 def load_data(sheet_name=DEFAULT_SHEET_NAME):
-    """Charge les données du fichier CSV ou Excel"""
-    if IS_CSV:
-        # Pour CSV, charger directement (pas de notion de feuilles)
-        df = pd.read_csv(DATA_FILE)
-    else:
-        # Pour Excel, charger la feuille spécifiée
-        df = pd.read_excel(DATA_FILE, sheet_name=sheet_name)
-    
+    """Charge les données du fichier Excel"""
+    df = pd.read_excel(DATA_FILE, sheet_name=sheet_name)
     if 'Date' in df.columns:
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df['Date'] = pd.to_datetime(df['Date'])
         df = df.sort_values('Date')
     return df
 
 @st.cache_data
 def get_sheet_names():
-    """Récupère la liste des feuilles disponibles dans le fichier Excel (ou nom par défaut pour CSV)"""
-    if IS_CSV:
-        # Pour CSV, retourner un nom de feuille par défaut
-        return ['Data']
-    else:
-        # Pour Excel, retourner les noms réels des feuilles
-        xls = pd.ExcelFile(DATA_FILE)
-        return xls.sheet_names
+    """Récupère la liste des feuilles disponibles dans le fichier Excel"""
+    xls = pd.ExcelFile(DATA_FILE)
+    return xls.sheet_names
 
 # Application principale
 def main():
@@ -102,21 +87,17 @@ def main():
     # Récupérer les noms des feuilles
     sheet_names = get_sheet_names()
     
-    # Sélecteur de feuille (uniquement pour Excel)
-    if not IS_CSV:
-        selected_sheet = st.selectbox(
-            "Sélectionnez une feuille à prévisualiser",
-            options=sheet_names,
-            index=0,
-            help="Choisissez la feuille Excel dont vous souhaitez voir un aperçu"
-        )
-    else:
-        selected_sheet = sheet_names[0]
-        st.info(f"📄 Format CSV détecté - Fichier: `{os.path.basename(DATA_FILE)}`")
+    # Sélecteur de feuille
+    selected_sheet = st.selectbox(
+        "Sélectionnez une feuille à prévisualiser",
+        options=sheet_names,
+        index=0,
+        help="Choisissez la feuille Excel dont vous souhaitez voir un aperçu"
+    )
     
     # Chargement des données pour la feuille sélectionnée
     with st.spinner(f'Chargement des données de la feuille "{selected_sheet}"...'):
-        df = load_data(str(selected_sheet))
+        df = load_data(selected_sheet)
     
     # Statistiques générales
     col1, col2, col3, col4 = st.columns(4)
@@ -234,17 +215,15 @@ def main():
     # Informations sur le fichier de données
     with st.expander("📁 Informations sur le fichier de données"):
         # Charger les données de la feuille sélectionnée ou par défaut
-        df_info = load_data(str(selected_sheet) if 'selected_sheet' in locals() else 'Valeurs Liquidatives')
+        df_info = load_data(selected_sheet if 'selected_sheet' in locals() else 'Valeurs Liquidatives')
         
         if selected_sheet == 'Valeurs Liquidatives' or 'selected_sheet' not in locals():
             fcp_count_info = len([col for col in df_info.columns if col.startswith('FCP')])
         else:
             fcp_count_info = len(df_info['FCP'].unique()) if 'FCP' in df_info.columns else 0
-        
-        file_type = "CSV" if IS_CSV else "Excel (XLSX)"
+            
         info_text = f"""
         - **Fichier**: `{DATA_FILE}`
-        - **Type**: {file_type}
         - **Nombre de FCP**: {fcp_count_info}
         """
         
