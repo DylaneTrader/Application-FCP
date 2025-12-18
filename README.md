@@ -90,14 +90,30 @@ Par défaut, l'application cherche le fichier `data_fcp.xlsx` dans le répertoir
 ```
 Application-FCP/
 ├── app.py                          # Page d'accueil et configuration principale
-├── 1_Valeurs_Liquidatives.py      # Module d'analyse des valeurs liquidatives
-├── 2_Souscriptions_Rachats.py     # Module de gestion des transactions
-├── 3_Actifs_Nets.py               # Module de suivi des actifs nets
-├── 4_A_Propos.py                  # Page d'information
-├── data_loader.py                 # Utilitaires de chargement de données
-├── data_fcp.xlsx                  # Fichier de données (non inclus dans le repo)
-└── README.md                      # Documentation
+├── config.py                       # Configuration centralisée (couleurs, constantes)
+├── utils.py                        # Fonctions utilitaires partagées
+├── data_loader.py                  # Utilitaire legacy (référence historique)
+├── requirements.txt                # Dépendances Python
+├── .gitignore                      # Fichiers à ignorer par Git
+├── pages/
+│   ├── 1_Valeurs_Liquidatives.py  # Module d'analyse des valeurs liquidatives
+│   ├── 2_Souscriptions_Rachats.py # Module de gestion des transactions
+│   ├── 3_Actifs_Nets.py           # Module de suivi des actifs nets
+│   └── 4_A_Propos.py              # Page d'information et documentation
+├── data_fcp.xlsx                   # Fichier de données (non inclus dans le repo)
+└── README.md                       # Documentation
 ```
+
+### Améliorations du Code (Décembre 2024)
+
+L'application a été optimisée pour améliorer la maintenabilité et les performances :
+
+- **Configuration centralisée** : Toutes les constantes et couleurs sont maintenant dans `config.py`
+- **Fonctions utilitaires** : Code partagé consolidé dans `utils.py` pour éviter la duplication
+- **Caching amélioré** : Utilisation optimale de `@st.cache_data` pour les performances
+- **CSS commun** : Styles partagés entre pages pour cohérence visuelle
+- **Documentation** : Ajout de docstrings complètes et de `requirements.txt`
+- **Gestion Git** : Ajout de `.gitignore` approprié pour projets Python/Streamlit
 
 ## 📊 Format des Données
 

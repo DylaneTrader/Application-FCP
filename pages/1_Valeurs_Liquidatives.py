@@ -11,40 +11,14 @@ import plotly.express as px
 from datetime import datetime, timedelta
 from sklearn.cluster import KMeans
 from scipy import stats
-import os
 
-# Constants
-TRADING_DAYS_PER_YEAR = 252
-DATA_FILE = os.getenv('FCP_DATA_FILE', 'data_fcp.xlsx')
-
-# Color Scheme
-PRIMARY_COLOR = "#114B80"    # Bleu profond — titres, boutons principaux
-SECONDARY_COLOR = "#567389"  # Bleu-gris — widgets, lignes, icônes
-ACCENT_COLOR = "#ACC7DF"     # Bleu clair — fonds de cartes, hover
-
-def hex_to_rgba(hex_color, alpha=1.0):
-    """
-    Convert hex color to rgba string format.
-    
-    Args:
-        hex_color (str): Hex color string (e.g., '#114B80' or '114B80')
-        alpha (float): Alpha transparency value between 0.0 and 1.0
-        
-    Returns:
-        str: RGBA color string (e.g., 'rgba(17, 75, 128, 0.3)')
-    """
-    if not 0.0 <= alpha <= 1.0:
-        raise ValueError(f"Alpha value must be between 0.0 and 1.0, got {alpha}")
-    hex_color = hex_color.lstrip('#')
-    if len(hex_color) != 6:
-        raise ValueError(f"Invalid hex color format: {hex_color}. Expected 6-character hex string.")
-    try:
-        r = int(hex_color[0:2], 16)
-        g = int(hex_color[2:4], 16)
-        b = int(hex_color[4:6], 16)
-    except ValueError:
-        raise ValueError(f"Invalid hex color format: {hex_color}. Could not parse hex values.")
-    return f'rgba({r}, {g}, {b}, {alpha})'
+# Import centralized configuration and utilities
+from config import (
+    TRADING_DAYS_PER_YEAR, DATA_FILE, DEFAULT_SHEET_NAME,
+    PRIMARY_COLOR, SECONDARY_COLOR, ACCENT_COLOR,
+    COMMON_CSS
+)
+from utils import load_data, hex_to_rgba
 
 def generate_llm_style_narrative(fcp_name, risk_profile, metrics, strengths, weaknesses):
     """
@@ -222,67 +196,12 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for simplified styling
+# Apply common CSS
+st.markdown(COMMON_CSS, unsafe_allow_html=True)
+
+# Additional CSS specific to this page
 st.markdown(f"""
 <style>
-    .ranking-card {{
-        background-color: #f8f9fa;
-        padding: 0.5rem;
-        border-radius: 3px;
-        border: 1px solid #dee2e6;
-        margin-bottom: 0.3rem;
-    }}
-    .ranking-card h3 {{
-        color: {PRIMARY_COLOR};
-        margin: 0 0 0.3rem 0;
-        font-size: 1rem;
-        font-weight: 600;
-    }}
-    .ranking-item {{
-        background-color: #ffffff;
-        padding: 0.3rem;
-        border-radius: 2px;
-        margin-bottom: 0.2rem;
-        border: 1px solid #e9ecef;
-    }}
-    .ranking-number {{
-        display: inline-block;
-        background-color: {SECONDARY_COLOR};
-        color: white;
-        width: 24px;
-        height: 24px;
-        border-radius: 3px;
-        text-align: center;
-        line-height: 24px;
-        margin-right: 5px;
-        font-weight: bold;
-        font-size: 0.85rem;
-    }}
-    .ranking-value {{
-        float: right;
-        font-weight: bold;
-        font-size: 0.95rem;
-    }}
-    .insight-box {{
-        background-color: #f8f9fa;
-        border-left: 2px solid {PRIMARY_COLOR};
-        padding: 0.5rem;
-        border-radius: 3px;
-        margin: 0.3rem 0;
-    }}
-    .insight-box h4 {{
-        color: {PRIMARY_COLOR};
-        margin: 0 0 0.3rem 0;
-        font-size: 0.95rem;
-    }}
-    .interpretation-note {{
-        background-color: #ffffff;
-        border-left: 2px solid {SECONDARY_COLOR};
-        padding: 0.5rem;
-        border-radius: 3px;
-        margin: 0.3rem 0;
-        border: 1px solid #e9ecef;
-    }}
     .alert-box {{
         background-color: #ffebee;
         border-left: 2px solid #dc3545;
@@ -875,28 +794,13 @@ def normalize_risk_fingerprint(fingerprints_dict):
     return normalized
 
 
-@st.cache_data
-def load_data():
-    """Charge les données du fichier CSV ou Excel"""
-    file_extension = os.path.splitext(DATA_FILE)[1].lower()
-    
-    if file_extension == '.csv':
-        df = pd.read_csv(DATA_FILE)
-    else:
-        df = pd.read_excel(DATA_FILE, sheet_name='Valeurs Liquidatives')
-    
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-    df = df.sort_values('Date')
-    return df
-
-
 def main():
     """Main function for the Valeurs Liquidatives page"""
     st.header("📈 Analyse des Valeurs Liquidatives")
     
     # Load data
     with st.spinner('Chargement des données...'):
-        df = load_data()
+        df = load_data(DEFAULT_SHEET_NAME)
     
     # Obtenir la liste des FCP
     fcp_cols = [col for col in df.columns if col != 'Date']
