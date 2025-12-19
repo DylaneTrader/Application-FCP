@@ -4,9 +4,9 @@
 ---
 
 **Date de création** : 18 décembre 2025  
-**Version** : 1.0  
+**Version** : 2.0  
 **Destinataires** : Gestionnaires de portefeuilles, Gestionnaires de risque, Équipe commerciale  
-**Auteur** : DYLANE - CGF BOURSE
+**Auteur** : DYLANE - CGF GESTION
 
 ---
 
