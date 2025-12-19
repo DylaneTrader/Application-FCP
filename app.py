@@ -59,17 +59,75 @@ st.markdown(f"""
 @st.cache_data
 def load_data(sheet_name=DEFAULT_SHEET_NAME):
     """Charge les données du fichier Excel"""
-    df = pd.read_excel(DATA_FILE, sheet_name=sheet_name)
-    if 'Date' in df.columns:
-        df['Date'] = pd.to_datetime(df['Date'])
-        df = df.sort_values('Date')
-    return df
+    try:
+        df = pd.read_excel(DATA_FILE, sheet_name=sheet_name)
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'])
+            df = df.sort_values('Date')
+        return df
+    except PermissionError:
+        st.error("""
+        ❌ **Erreur d'accès au fichier**
+        
+        Le fichier de données est actuellement verrouillé. Cela se produit généralement quand :
+        - Le fichier Excel est ouvert dans une autre application
+        - Le fichier est en cours d'utilisation par un autre programme
+        
+        **Solutions :**
+        1. Fermez le fichier Excel s'il est ouvert
+        2. Vérifiez qu'aucun autre programme n'utilise le fichier
+        3. Assurez-vous d'avoir les permissions nécessaires pour lire le fichier
+        
+        Puis rafraîchissez cette page.
+        """)
+        st.stop()
+    except FileNotFoundError:
+        st.error(f"""
+        ❌ **Fichier de données introuvable**
+        
+        Le fichier `{DATA_FILE}` n'a pas été trouvé dans le répertoire attendu.
+        
+        **Solutions :**
+        1. Vérifiez que le fichier existe dans le dossier de l'application
+        2. Vérifiez le nom du fichier (doit être exactement `{DATA_FILE}`)
+        3. Assurez-vous que le fichier n'a pas été déplacé ou supprimé
+        """)
+        st.stop()
 
 @st.cache_data
 def get_sheet_names():
     """Récupère la liste des feuilles disponibles dans le fichier Excel"""
-    xls = pd.ExcelFile(DATA_FILE)
-    return xls.sheet_names
+    try:
+        xls = pd.ExcelFile(DATA_FILE)
+        return xls.sheet_names
+    except PermissionError:
+        st.error("""
+        ❌ **Erreur d'accès au fichier**
+        
+        Le fichier de données est actuellement verrouillé. Cela se produit généralement quand :
+        - Le fichier Excel est ouvert dans une autre application
+        - Le fichier est en cours d'utilisation par un autre programme
+        
+        **Solutions :**
+        1. **Fermez le fichier Excel** s'il est ouvert
+        2. Vérifiez qu'aucun autre programme n'utilise le fichier
+        3. Assurez-vous d'avoir les permissions nécessaires pour lire le fichier
+        
+        Puis rafraîchissez cette page (F5 ou Ctrl+R).
+        """)
+        st.stop()
+    except FileNotFoundError:
+        st.error(f"""
+        ❌ **Fichier de données introuvable**
+        
+        Le fichier `{DATA_FILE}` n'a pas été trouvé dans le répertoire attendu.
+        
+        **Solutions :**
+        1. Vérifiez que le fichier existe dans le dossier de l'application
+        2. Vérifiez le nom du fichier (doit être exactement `{DATA_FILE}`)
+        3. Assurez-vous que le fichier n'a pas été déplacé ou supprimé
+        """)
+        st.stop()
 
 # Application principale
 def main():

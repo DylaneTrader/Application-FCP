@@ -115,6 +115,12 @@ def load_actifs_nets_data():
     
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
     df = df.sort_values('Date')
+    
+    # Convert all columns except 'Date' to numeric
+    for col in df.columns:
+        if col != 'Date':
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
     return df
 
 
@@ -147,6 +153,12 @@ def load_valeurs_liquidatives_data():
     
     df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
     df = df.sort_values('Date')
+    
+    # Convert all columns except 'Date' to numeric
+    for col in df.columns:
+        if col != 'Date':
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
     return df
 
 
@@ -169,34 +181,53 @@ def calculate_cagr(series, periods_per_year=252):
 
 def calculate_correlation_with_flows(df_actifs, df_flows, fcp_name, date_range):
     """Calculate correlation between net assets and subscription/redemption flows"""
-    # Filter flows for the FCP
-    df_fcp_flows = df_flows[df_flows['FCP'] == fcp_name].copy()
+    try:
+        # Check if FCP exists in actifs dataframe
+        if fcp_name not in df_actifs.columns:
+            return None, None, None
+        
+        # Filter flows for the FCP
+        df_fcp_flows = df_flows[df_flows['FCP'] == fcp_name].copy()
+        
+        if df_fcp_flows.empty:
+            return None, None, None
+        
+        # Calculate net flows (subscriptions - redemptions)
+        df_fcp_flows['Montant_Signe'] = df_fcp_flows.apply(
+            lambda x: x['Montant'] if x['Opérations'] == 'Souscriptions' else -x['Montant'],
+            axis=1
+        )
+        
+        # Aggregate by date
+        daily_flows = df_fcp_flows.groupby('Date')['Montant_Signe'].sum()
+        
+        # Get actifs nets for the FCP
+        df_actifs_fcp = df_actifs.set_index('Date')[fcp_name]
+        
+        # Align dates
+        common_dates = df_actifs_fcp.index.intersection(daily_flows.index)
+        
+        if len(common_dates) < 2:
+            return None, None, None
+        
+        actifs_aligned = df_actifs_fcp.loc[common_dates]
+        flows_aligned = daily_flows.loc[common_dates]
+        
+        # Remove NaN values
+        mask = ~(actifs_aligned.isna() | flows_aligned.isna())
+        actifs_aligned = actifs_aligned[mask]
+        flows_aligned = flows_aligned[mask]
+        
+        if len(actifs_aligned) < 2:
+            return None, None, None
+        
+        # Calculate correlation
+        correlation = actifs_aligned.corr(flows_aligned)
+        
+        return correlation, actifs_aligned, flows_aligned
     
-    # Calculate net flows (subscriptions - redemptions)
-    df_fcp_flows['Montant_Signe'] = df_fcp_flows.apply(
-        lambda x: x['Montant'] if x['Opérations'] == 'Souscriptions' else -x['Montant'],
-        axis=1
-    )
-    
-    # Aggregate by date
-    daily_flows = df_fcp_flows.groupby('Date')['Montant_Signe'].sum()
-    
-    # Get actifs nets for the FCP
-    df_actifs_fcp = df_actifs.set_index('Date')[fcp_name]
-    
-    # Align dates
-    common_dates = df_actifs_fcp.index.intersection(daily_flows.index)
-    
-    if len(common_dates) < 2:
+    except (KeyError, IndexError, ValueError) as e:
         return None, None, None
-    
-    actifs_aligned = df_actifs_fcp.loc[common_dates]
-    flows_aligned = daily_flows.loc[common_dates]
-    
-    # Calculate correlation
-    correlation = actifs_aligned.corr(flows_aligned)
-    
-    return correlation, actifs_aligned, flows_aligned
 
 
 def calculate_vl_contribution(df_actifs, df_vl, fcp_name, date_range):
@@ -204,41 +235,57 @@ def calculate_vl_contribution(df_actifs, df_vl, fcp_name, date_range):
     Calculate the contribution of VL performance vs flows to net assets change
     Returns: VL contribution (%), Flow contribution (%), correlation between VL and actifs
     """
-    # Get the data for the FCP
-    df_actifs_fcp = df_actifs.set_index('Date')[fcp_name]
-    df_vl_fcp = df_vl.set_index('Date')[fcp_name]
+    try:
+        # Check if FCP exists in both dataframes
+        if fcp_name not in df_actifs.columns or fcp_name not in df_vl.columns:
+            return None, None, None
+        
+        # Get the data for the FCP
+        df_actifs_fcp = df_actifs.set_index('Date')[fcp_name]
+        df_vl_fcp = df_vl.set_index('Date')[fcp_name]
+        
+        # Align dates
+        common_dates = df_actifs_fcp.index.intersection(df_vl_fcp.index)
+        
+        if len(common_dates) < 2:
+            return None, None, None
+        
+        actifs_aligned = df_actifs_fcp.loc[common_dates]
+        vl_aligned = df_vl_fcp.loc[common_dates]
+        
+        # Remove NaN values
+        mask = ~(actifs_aligned.isna() | vl_aligned.isna())
+        actifs_aligned = actifs_aligned[mask]
+        vl_aligned = vl_aligned[mask]
+        
+        if len(actifs_aligned) < 2 or actifs_aligned.iloc[0] == 0 or vl_aligned.iloc[0] == 0:
+            return None, None, None
+        
+        # Calculate changes
+        actifs_change = actifs_aligned.iloc[-1] - actifs_aligned.iloc[0]
+        vl_perf = (vl_aligned.iloc[-1] / vl_aligned.iloc[0]) - 1
+        
+        # Estimate number of shares (assuming stable at start)
+        shares_start = actifs_aligned.iloc[0] / vl_aligned.iloc[0]
+        
+        # VL contribution to actifs change (if shares stayed constant)
+        vl_contribution_abs = shares_start * (vl_aligned.iloc[-1] - vl_aligned.iloc[0])
+        
+        # Calculate percentages
+        if actifs_change != 0:
+            vl_contribution_pct = (vl_contribution_abs / actifs_change) * 100
+            flow_contribution_pct = 100 - vl_contribution_pct
+        else:
+            vl_contribution_pct = 0
+            flow_contribution_pct = 0
+        
+        # Calculate correlation
+        correlation = actifs_aligned.corr(vl_aligned)
+        
+        return vl_contribution_pct, flow_contribution_pct, correlation
     
-    # Align dates
-    common_dates = df_actifs_fcp.index.intersection(df_vl_fcp.index)
-    
-    if len(common_dates) < 2:
+    except (KeyError, IndexError, ZeroDivisionError, ValueError) as e:
         return None, None, None
-    
-    actifs_aligned = df_actifs_fcp.loc[common_dates]
-    vl_aligned = df_vl_fcp.loc[common_dates]
-    
-    # Calculate changes
-    actifs_change = actifs_aligned.iloc[-1] - actifs_aligned.iloc[0]
-    vl_perf = (vl_aligned.iloc[-1] / vl_aligned.iloc[0]) - 1
-    
-    # Estimate number of shares (assuming stable at start)
-    shares_start = actifs_aligned.iloc[0] / vl_aligned.iloc[0]
-    
-    # VL contribution to actifs change (if shares stayed constant)
-    vl_contribution_abs = shares_start * (vl_aligned.iloc[-1] - vl_aligned.iloc[0])
-    
-    # Calculate percentages
-    if actifs_change != 0:
-        vl_contribution_pct = (vl_contribution_abs / actifs_change) * 100
-        flow_contribution_pct = 100 - vl_contribution_pct
-    else:
-        vl_contribution_pct = 0
-        flow_contribution_pct = 0
-    
-    # Calculate correlation
-    correlation = actifs_aligned.corr(vl_aligned)
-    
-    return vl_contribution_pct, flow_contribution_pct, correlation
 
 
 def analyze_client_types(df_flows, selected_fcps, date_range):
@@ -310,12 +357,67 @@ def main():
     try:
         # Load data
         with st.spinner('Chargement des données...'):
-            df = load_actifs_nets_data()
-            df_flows = load_souscriptions_rachats_data()
-            df_vl = load_valeurs_liquidatives_data()
+            try:
+                df = load_actifs_nets_data()
+                df_flows = load_souscriptions_rachats_data()
+                df_vl = load_valeurs_liquidatives_data()
+            except PermissionError as pe:
+                st.error("""
+                ❌ **Erreur d'accès au fichier**
+                
+                Le fichier de données est actuellement verrouillé. Cela se produit généralement quand :
+                - Le fichier Excel est ouvert dans une autre application
+                - Le fichier est en cours d'utilisation par un autre programme
+                
+                **Solutions :**
+                1. Fermez le fichier Excel s'il est ouvert
+                2. Vérifiez qu'aucun autre programme n'utilise le fichier
+                3. Assurez-vous d'avoir les permissions nécessaires pour lire le fichier
+                
+                Puis rafraîchissez cette page.
+                """)
+                st.stop()
+            except FileNotFoundError as fnf:
+                st.error(f"""
+                ❌ **Fichier de données introuvable**
+                
+                Le fichier `data_fcp.xlsx` n'a pas été trouvé dans le répertoire attendu.
+                
+                **Solutions :**
+                1. Vérifiez que le fichier existe dans le dossier de l'application
+                2. Vérifiez le nom du fichier (doit être exactement `data_fcp.xlsx`)
+                3. Assurez-vous que le fichier n'a pas été déplacé ou supprimé
+                """)
+                st.stop()
         
         # Get list of FCP columns (all columns except Date)
         fcp_columns = [col for col in df.columns if col != 'Date']
+        
+        # Validate FCP columns - ensure they contain valid data
+        valid_fcp_columns = []
+        invalid_fcps = []
+        
+        for fcp in fcp_columns:
+            # Check if the FCP has at least some non-NaN numeric values
+            non_null_values = df[fcp].dropna()
+            if len(non_null_values) > 0:
+                valid_fcp_columns.append(fcp)
+            else:
+                invalid_fcps.append(fcp)
+        
+        # Display warning if some FCPs are invalid
+        if invalid_fcps:
+            st.warning(f"""
+            ⚠️ **Attention:** Les FCP suivants ont été exclus car ils ne contiennent pas de données valides :
+            {', '.join(invalid_fcps)}
+            """)
+        
+        # Use only valid FCPs
+        if not valid_fcp_columns:
+            st.error("❌ Aucun FCP avec des données valides n'a été trouvé dans le fichier.")
+            st.stop()
+        
+        fcp_columns = valid_fcp_columns
         
         # ===================
         # Sidebar Filters
