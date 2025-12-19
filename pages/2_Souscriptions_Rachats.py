@@ -2,7 +2,7 @@
 Souscriptions et Rachats Analysis Page
 Analyzes subscriptions and redemptions for FCP funds
 """
-
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -104,16 +104,10 @@ st.markdown(f"""
 
 @st.cache_data
 def load_souscriptions_rachats_data():
-    """Load subscriptions and redemptions data from CSV or Excel"""
+    """Load subscriptions and redemptions data from Excel"""
     data_file = os.getenv('FCP_DATA_FILE', 'data_fcp.xlsx')
-    file_extension = os.path.splitext(data_file)[1].lower()
-    
-    if file_extension == '.csv':
-        df = pd.read_csv(data_file)
-    else:
-        df = pd.read_excel(data_file, sheet_name='Souscriptions Rachats')
-    
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    df = pd.read_excel(data_file, sheet_name='Souscriptions Rachats')
+    df['Date'] = pd.to_datetime(df['Date'])
     df = df.sort_values('Date')
     return df
 
@@ -599,7 +593,7 @@ def main():
                 key="client_types_analysis"
             )
         with col2:
-            compare_clients = st.checkbox("Comparer au Total", value=True, key="compare_clients_total")
+            compare_clients = st.checkbox("Comparer au Total", value=False, key="compare_clients_total")
         
         if not selected_client_types_analysis:
             st.warning("⚠️ Veuillez sélectionner au moins un type de client")
