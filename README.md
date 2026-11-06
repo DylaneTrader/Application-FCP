@@ -1,163 +1,66 @@
-# 📊 Application de Gestion FCP
+# Plateforme FCP
 
-Application web interactive pour l'analyse et la gestion de Fonds Communs de Placement (FCP), développée avec Streamlit.
+Application Django ouverte à toute société de gestion d'OPCVM (SGO) : valeurs liquidatives de ses FCP,
+rendement attendu, simulateur de placement, souscriptions et rachats, actifs nets, et une API REST pour publier
+et lire ces données. Chaque SGO a ses propres couleurs et son logo ; CGF Gestion (#114B80, #567389, #ACC7DF)
+sert d'exemple.
 
-## 🎯 Objectif
+Le simulateur reprend celui du dépôt `Simulateur-d-investissement`, qui peut être supprimé.
 
-Cette application offre une plateforme complète pour analyser les performances des FCP, gérer les souscriptions/rachats, suivre les actifs nets et générer des rapports détaillés avec visualisations avancées.
+## Pages
 
-## ✨ Fonctionnalités Principales
+| Page | Accès | Contenu |
+|---|---|---|
+| Sociétés de gestion | public | SGO de la plateforme |
+| Fonds | public | Dernière VL, performances, volatilité de chaque fonds de la SGO |
+| Fiche du fonds | public | Historique des VL (périodes, base 100, export CSV), performances, années civiles, pertes depuis le plus haut, risque |
+| Rendement attendu | public | Rendement médian et moyen estimés sur 1, 3, 5 ans ou tout l'historique ; projection en éventail, risque de perte, chance d'atteindre un objectif |
+| Simulateur | public | Calcule valeur finale, versement, capital ou durée ; rendement d'un fonds au choix, inflation, phase de retraits |
+| Souscriptions et rachats | membres de la SGO | Collecte mensuelle, par type de client, par fonds |
+| Actifs nets | membres de la SGO | Encours total et par fonds, évolution sur un an |
+| Méthodes | public | Formules et API |
 
-### 1. 📈 Valeurs Liquidatives
-- **Analyse de performance** : Visualisation des valeurs liquidatives avec graphiques interactifs
-- **Calculs de rendement** : Rendements annualisés, volatilité, ratios de Sharpe
-- **Comparaisons multi-fonds** : Analyse comparative entre plusieurs FCP
-- **Clustering et segmentation** : Regroupement automatique des fonds par profil de risque
-- **Rapports narratifs** : Génération automatique de résumés analytiques
-
-### 2. 💰 Souscriptions & Rachats
-- Gestion des transactions de souscription et rachat
-- Suivi des flux entrants et sortants
-- Historique détaillé des opérations
-
-### 3. 💼 Actifs Nets
-- Suivi de l'évolution des actifs nets
-- Analyse de la composition du portefeuille
-- Indicateurs de performance globale
-
-### 4. ℹ️ À Propos
-- Documentation de l'application
-- Informations sur les méthodologies de calcul
-- Guide d'utilisation
-
-## 🛠️ Technologies Utilisées
-
-- **Framework** : Streamlit
-- **Data Analysis** : Pandas, NumPy
-- **Visualisations** : Plotly, Plotly Express
-- **Machine Learning** : Scikit-learn (clustering K-Means)
-- **Statistiques** : SciPy
-
-## 📋 Prérequis
-
-- Python 3.8 ou supérieur
-- Fichier de données FCP au format **CSV** ou **Excel (XLSX)**
-  - Format CSV : `data_fcp.csv`
-  - Format Excel : `data_fcp.xlsx`
-
-## 🚀 Installation
-
-1. **Cloner le repository**
-```bash
-git clone <repository-url>
-cd Application-FCP
-```
-
-2. **Installer les dépendances**
-```bash
-pip install streamlit pandas numpy plotly scikit-learn scipy openpyxl
-```
-
-## 💻 Utilisation
-
-### Démarrage de l'application
+## Lancer en local
 
 ```bash
-streamlit run app.py
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py amorcer_demo          # SGO CGF Gestion + data_fcp.xlsx
+python manage.py createsuperuser
+python manage.py runserver
 ```
 
-L'application s'ouvrira automatiquement dans votre navigateur par défaut à l'adresse `http://localhost:8501`
-
-### Configuration
-
-L'application **détecte automatiquement** le format du fichier (CSV ou XLSX) en fonction de l'extension.
-
-Pour spécifier un fichier de données personnalisé, utilisez la variable d'environnement :
+Ajouter une SGO et ses membres dans `/admin/`, puis importer son classeur :
 
 ```bash
-set FCP_DATA_FILE=chemin/vers/votre/fichier.xlsx  # Windows - Excel
-set FCP_DATA_FILE=chemin/vers/votre/fichier.csv   # Windows - CSV
-export FCP_DATA_FILE=chemin/vers/votre/fichier.xlsx  # Linux/Mac - Excel
-export FCP_DATA_FILE=chemin/vers/votre/fichier.csv   # Linux/Mac - CSV
+python manage.py importer_classeur fichier.xlsx --sgo "Nom de la SGO" --creer
 ```
 
-Par défaut, l'application cherche le fichier `data_fcp.xlsx` dans le répertoire courant.
+Le classeur peut contenir les feuilles « Valeurs Liquidatives » et « Actifs Nets » (Date, puis une colonne par fonds)
+et « Souscriptions Rachats » (Date, Type de clients, Opérations, FCP, Montant). Un fonds connu sous deux noms se
+règle par le champ « alias » du fonds ; l'import signale les noms présents dans une seule feuille.
 
-**Note** : Pour les fichiers CSV, toutes les données doivent être dans un seul fichier. Pour les fichiers Excel, les données peuvent être organisées en plusieurs feuilles (Valeurs Liquidatives, Souscriptions Rachats, Actifs Nets).
+## API
 
-## 📁 Structure du Projet
+Lecture publique ; écriture des VL, lecture et écriture des actifs nets et des flux réservées aux membres de la SGO,
+avec un jeton (`POST /api/jeton/`, puis `Authorization: Token <jeton>`).
 
+| Méthode | Adresse |
+|---|---|
+| GET | `/api/sgo/`, `/api/fonds/?sgo=<slug>` |
+| GET, POST | `/api/fonds/<id>/vl/` (`?debut=&fin=` ; POST `[{"date", "valeur"}]`) |
+| GET | `/api/fonds/<id>/performances/`, `/api/fonds/<id>/rendement-attendu/?annees=3&horizon=5` |
+| GET, POST | `/api/fonds/<id>/actifs-nets/`, `/api/fonds/<id>/flux/` |
+| POST | `/api/simulation/` |
+
+## Production
+
+Variables : `DJANGO_SECRET_KEY`, `DJANGO_DEBUG=0`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`,
+`DATABASE_URL` (PostgreSQL). Puis `python manage.py collectstatic` et `gunicorn config.wsgi`. Les fichiers
+statiques sont servis par WhiteNoise. Streamlit Cloud ne fait pas tourner Django : Render, Railway ou un serveur.
+
+## Tests
+
+```bash
+python manage.py test fonds
 ```
-Application-FCP/
-├── app.py                          # Page d'accueil et configuration principale
-├── 1_Valeurs_Liquidatives.py      # Module d'analyse des valeurs liquidatives
-├── 2_Souscriptions_Rachats.py     # Module de gestion des transactions
-├── 3_Actifs_Nets.py               # Module de suivi des actifs nets
-├── 4_A_Propos.py                  # Page d'information
-├── data_loader.py                 # Utilitaires de chargement de données
-├── data_fcp.xlsx                  # Fichier de données (non inclus dans le repo)
-└── README.md                      # Documentation
-```
-
-## 📊 Format des Données
-
-L'application supporte deux formats de fichiers :
-
-### Format Excel (XLSX) - Recommandé
-Le fichier Excel peut contenir plusieurs feuilles pour organiser les données :
-- **Valeurs Liquidatives** : Données quotidiennes des VL
-  - Colonne `Date` : Format date (DD/MM/YYYY)
-  - Colonnes suivantes : Une colonne par FCP avec les valeurs liquidatives
-- **Souscriptions Rachats** : Transactions de souscription et rachat
-  - Colonnes : Date, FCP, Opérations, Montant, Type de Client
-- **Actifs Nets** : Évolution des actifs nets par FCP
-  - Colonnes : Date, FCP, Montant
-
-### Format CSV
-Pour les fichiers CSV, toutes les données doivent être dans un seul fichier :
-- Colonne `Date` : Format date (YYYY-MM-DD ou DD/MM/YYYY)
-- Colonnes suivantes : Selon le type de données (VL, transactions, actifs)
-- Encodage : UTF-8 recommandé
-- Séparateur : Virgule (,)
-
-## 🎨 Thème et Design
-
-L'application utilise une palette de couleurs professionnelle :
-- **Bleu profond** (#114B80) : Titres et boutons principaux
-- **Bleu-gris** (#567389) : Widgets et éléments secondaires
-- **Bleu clair** (#ACC7DF) : Arrière-plans et effets de survol
-
-## 📈 Métriques Calculées
-
-L'application calcule automatiquement :
-- Rendements annualisés
-- Volatilité (écart-type)
-- Ratio de Sharpe
-- Drawdown maximum
-- Corrélations entre fonds
-- Profils de risque par clustering
-
-## 🤝 Contribution
-
-Pour contribuer au projet :
-1. Fork le repository
-2. Créez une branche pour votre fonctionnalité (`git checkout -b feature/nouvelle-fonctionnalite`)
-3. Committez vos changements (`git commit -m 'Ajout d'une nouvelle fonctionnalité'`)
-4. Push vers la branche (`git push origin feature/nouvelle-fonctionnalite`)
-5. Ouvrez une Pull Request
-
-## 📝 Licence
-
-Ce projet est développé pour **CGF BOURSE** - Tous droits réservés.
-
-## 👤 Auteur
-
-**DYLANE** - CGF BOURSE
-
-## 📞 Support
-
-Pour toute question ou problème, veuillez contacter l'équipe de développement CGF BOURSE.
-
----
-
-**Note** : Cette application est destinée à un usage interne pour l'analyse professionnelle des fonds communs de placement.

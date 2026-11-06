@@ -1,0 +1,43 @@
+{% extends "fonds/base.html" %}{% load format_fr %}
+{% block titre %}Actifs nets{% endblock %}
+{% block contenu %}
+<div class="titre">
+  <div>
+    <h1>Actifs nets</h1>
+    <p class="sous-titre">Encours des fonds de {{ sgo.nom }}{% if not vide %} au {{ date|date:"d/m/Y" }}{% endif %}. Page réservée aux membres de la SGO.</p>
+  </div>
+</div>
+{% if vide %}
+  <div class="alerte info">Aucun actif net enregistré. Importez la feuille « Actifs Nets » ou publiez-les par l'API.</div>
+{% else %}
+<div class="indicateurs">
+  <div class="indicateur"><div class="libelle">Total des actifs nets</div><div class="valeur">{{ total|montant }}</div>
+    <div class="note">au {{ date|date:"d/m/Y" }}</div></div>
+  <div class="indicateur"><div class="libelle">Évolution sur un an</div><div class="valeur {{ evolution|signe }}">{{ evolution|pct_signe:1 }}</div></div>
+  <div class="indicateur"><div class="libelle">Fonds</div><div class="valeur">{{ lignes|length }}</div></div>
+</div>
+<div class="carte">
+  <h2>Évolution du total</h2>
+  <div class="graphique" data-figure="fig-total" role="img" aria-label="Actifs nets totaux"></div>
+  {{ fig_total|json_script:"fig-total" }}
+  <p class="petit">Chaque fonds garde son dernier encours connu jusqu'à la publication suivante.</p>
+</div>
+<div class="grille">
+  <div class="carte">
+    <h2>Répartition</h2>
+    <div class="graphique" data-figure="fig-parts" role="img" aria-label="Répartition des actifs nets"></div>
+    {{ fig_parts|json_script:"fig-parts" }}
+  </div>
+  <div class="carte">
+    <h2>Par fonds</h2>
+    <div class="defile"><table>
+      <thead><tr><th>Fonds</th><th class="n">Actif net</th><th class="n">Part</th><th class="n">Sur un an</th></tr></thead>
+      <tbody>{% for l in lignes %}<tr>
+        <td>{% if l.fonds %}<a href="{{ l.fonds.get_absolute_url }}">{{ l.nom }}</a>{% else %}{{ l.nom }}{% endif %}</td>
+        <td class="n">{{ l.montant|nombre }}</td><td class="n">{{ l.part|pct:1 }}</td>
+        <td class="n {{ l.evolution|signe }}">{{ l.evolution|pct_signe:1 }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

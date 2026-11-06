@@ -1,0 +1,76 @@
+{% extends "fonds/base.html" %}{% load format_fr %}
+{% block titre %}Simulateur{% endblock %}
+{% block contenu %}
+<div class="titre">
+  <div>
+    <h1>Simulateur de placement</h1>
+    <p class="sous-titre">Fixez trois grandeurs, le simulateur calcule la quatrième. Le rendement peut venir de l'historique d'un fonds de {{ sgo.nom }}.</p>
+  </div>
+</div>
+
+<form class="carte" method="get" id="formulaire"
+      hx-get="{% url 'simulateur' sgo.slug %}" hx-target="#resultats" hx-swap="innerHTML" hx-push-url="true"
+      hx-trigger="change, keyup changed delay:500ms">
+  <fieldset style="border:0;padding:0;margin:0 0 1rem">
+    <legend class="petit" style="margin-bottom:.35rem">Grandeur à calculer</legend>
+    <div class="segment">
+      {% for code, nom in calculs.items %}
+        <label><input type="radio" name="calcul" value="{{ code }}"{% if code == p.calcul %} checked{% endif %}><span>{{ nom }}</span></label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  <div class="filtres">
+    <div class="champ" data-champ="capital_initial"><label for="capital">Capital initial (FCFA)</label>
+      <input id="capital" name="capital" type="text" inputmode="decimal" value="{{ p.capital|stringformat:'.0f' }}"></div>
+    <div class="champ" data-champ="versement"><label for="versement">Versement mensuel</label>
+      <input id="versement" name="versement" type="text" inputmode="decimal" value="{{ p.versement|stringformat:'.0f' }}"></div>
+    <div class="champ" data-champ="duree"><label for="annees">Durée (années)</label>
+      <input id="annees" name="annees" type="number" step="0.5" min="0.5" max="100" value="{{ p.annees|stringformat:'g' }}"></div>
+    <div class="champ" data-champ="valeur_finale"><label for="objectif">Objectif (valeur finale)</label>
+      <input id="objectif" name="objectif" type="text" inputmode="decimal" value="{{ p.objectif|stringformat:'.0f' }}"></div>
+  </div>
+  <div class="filtres" style="margin-top:.75rem">
+    <div class="champ" style="flex-basis:260px"><label for="fonds">Rendement de référence</label>
+      <select id="fonds" name="fonds">
+        <option value="" {% if not p.fonds %}selected{% endif %}>Taux libre</option>
+        {% for t in taux_fonds %}<option value="{{ t.fonds.slug }}" data-taux="{{ t.taux|stringformat:'.4f' }}"{% if t.fonds.slug == p.fonds %} selected{% endif %}>{{ t.fonds.nom }} : {{ t.taux|pct_signe }} / an</option>{% endfor %}
+      </select></div>
+    <div class="champ"><label for="taux">Rendement annuel (%)</label>
+      <input id="taux" name="taux" type="number" step="0.01" min="-99" max="100" value="{{ p.taux|stringformat:'.2f' }}"></div>
+    <div class="champ"><label for="inflation">Inflation annuelle (%)</label>
+      <input id="inflation" name="inflation" type="number" step="0.1" min="0" max="50" value="{{ p.inflation|stringformat:'.1f' }}"></div>
+  </div>
+  <details style="margin-top:1rem">
+    <summary>Phase de retraits après l'épargne</summary>
+    <div class="filtres" style="margin-top:.6rem">
+      <div class="champ"><label for="retrait">Retrait mensuel</label>
+        <input id="retrait" name="retrait" type="text" inputmode="decimal" value="{{ p.retrait|stringformat:'.0f' }}"></div>
+      <div class="champ"><label for="annees_retrait">Durée des retraits (années)</label>
+        <input id="annees_retrait" name="annees_retrait" type="number" min="1" max="60" value="{{ p.annees_retrait|stringformat:'.0f' }}"></div>
+    </div>
+  </details>
+  <noscript><button class="bouton" type="submit" style="margin-top:1rem">Calculer</button></noscript>
+</form>
+
+<div id="resultats">{% include "fonds/_simulation.html" %}</div>
+
+<script>
+// Le champ calculé est masqué ; choisir un fonds reprend son rendement attendu.
+(function () {
+  var form = document.getElementById("formulaire");
+  function masquer() {
+    var calcul = form.querySelector("input[name=calcul]:checked").value;
+    form.querySelectorAll("[data-champ]").forEach(function (c) { c.hidden = c.dataset.champ === calcul; });
+  }
+  form.addEventListener("change", function (e) {
+    if (e.target.name === "calcul") masquer();
+    if (e.target.id === "fonds") {
+      var o = e.target.selectedOptions[0];
+      if (o && o.dataset.taux) document.getElementById("taux").value = (parseFloat(o.dataset.taux) * 100).toFixed(2);
+    }
+    if (e.target.id === "taux") document.getElementById("fonds").value = "";
+  }, true);
+  masquer();
+})();
+</script>
+{% endblock %}

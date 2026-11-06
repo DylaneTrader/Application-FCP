@@ -1,0 +1,68 @@
+{% extends "fonds/base.html" %}
+{% block titre %}Méthodes{% endblock %}
+{% block contenu %}
+<div class="titre"><div><h1>Méthodes de calcul</h1>
+  <p class="sous-titre">Comment la plateforme calcule les performances, le rendement attendu et les simulations.</p></div></div>
+
+<div class="carte">
+  <h2>Performances et risque</h2>
+  <p>Les rendements sont calculés de VL à VL, sans frais d'entrée ni de sortie. La fréquence d'annualisation est le nombre
+    réel de VL publiées par an (≈ 252 en quotidien, ≈ 52 en hebdomadaire). Le rendement annualisé est le taux composé
+    (VL<sub>fin</sub> / VL<sub>début</sub>)<sup>365,25 / jours</sup> − 1.</p>
+  <ul>
+    <li><strong>Volatilité</strong> : écart-type des rendements × √(VL par an).</li>
+    <li><strong>Sharpe</strong> : (rendement annualisé − taux sans risque de la SGO) / volatilité.
+      <strong>Sortino</strong> : idem avec le seul écart à la baisse.</li>
+    <li><strong>Perte maximale</strong> : plus forte baisse de la VL depuis son plus haut précédent.</li>
+    <li><strong>VaR historique 95 %</strong> : perte d'une période dépassée une fois sur vingt.</li>
+    <li><strong>Années civiles</strong> : dernière VL de l'année / dernière VL de l'année précédente.</li>
+  </ul>
+</div>
+
+<div class="carte">
+  <h2>Rendement attendu</h2>
+  <p>On estime sur l'historique retenu la moyenne μ et l'écart-type σ des rendements logarithmiques, annualisés.</p>
+  <ul>
+    <li><strong>Rendement médian</strong> e<sup>μ</sup> − 1 : le rendement composé observé ; la moitié des scénarios font mieux.</li>
+    <li><strong>Rendement moyen</strong> e<sup>μ + σ²/2</sup> − 1 : l'espérance d'un an de placement, plus élevée que la médiane.</li>
+    <li><strong>Projection</strong> : 4 000 trajectoires mensuelles d'un modèle lognormal (μ, σ), versements en fin de mois.
+      Les bandes contiennent 50 % et 90 % des scénarios ; la probabilité de perte est la part des scénarios qui finissent
+      sous le montant investi.</li>
+    <li><strong>Placements d'un an déjà réalisés</strong> : tous les rendements sur un an glissant de l'historique, sans modèle.</li>
+  </ul>
+  <p class="petit">Hypothèses : rendements indépendants d'une période à l'autre et de même loi que dans le passé. Un fonds
+    monétaire ou obligataire, dont la VL monte presque en ligne droite, aura une fourchette étroite ; elle peut sous-estimer
+    un risque de taux ou de crédit qui ne s'est pas matérialisé dans l'historique.</p>
+</div>
+
+<div class="carte">
+  <h2>Simulateur</h2>
+  <p>Repris du Simulateur d'investissement de CGF Gestion. Trois grandeurs parmi capital initial, versement mensuel, durée et
+    valeur finale permettent de calculer la quatrième. Le rendement saisi est un taux annuel effectif, converti en taux
+    mensuel équivalent (1 + t)<sup>1/12</sup> − 1, de sorte qu'un capital placé un an à 6 % rapporte exactement 6 %.
+    L'ancien simulateur divisait le taux par 12, ce qui donnait un peu plus (6,17 % effectifs pour 6 % saisis).</p>
+  <p>Choisir un fonds reprend son rendement attendu médian sur 3 ans (tout l'historique s'il est plus court) et ajoute la
+    fourchette de résultats que donne sa volatilité. La valeur en pouvoir d'achat actuel divise chaque montant par
+    (1 + inflation)<sup>années</sup>.</p>
+</div>
+
+<div class="carte" id="api">
+  <h2>API pour les SGO</h2>
+  <p>Lecture publique, en JSON. Écriture, et lecture des actifs nets et des flux, réservées aux membres de la SGO du fonds,
+    avec un jeton : <code>POST /api/jeton/</code> avec <code>username</code> et <code>password</code>, puis l'en-tête
+    <code>Authorization: Token &lt;jeton&gt;</code>.</p>
+  <div class="defile"><table>
+    <thead><tr><th>Méthode</th><th>Adresse</th><th>Rôle</th></tr></thead>
+    <tbody>
+      <tr><td>GET</td><td><code>/api/sgo/</code></td><td>SGO, couleurs, nombre de fonds</td></tr>
+      <tr><td>GET</td><td><code>/api/fonds/?sgo=&lt;slug&gt;</code></td><td>Fonds et dernière VL</td></tr>
+      <tr><td>GET, POST</td><td><code>/api/fonds/&lt;id&gt;/vl/</code></td><td>VL (<code>?debut=&amp;fin=</code>) ; POST : <code>[{"date": "2026-11-05", "valeur": 1234.56}]</code>, créées ou mises à jour</td></tr>
+      <tr><td>GET</td><td><code>/api/fonds/&lt;id&gt;/performances/</code></td><td>Performances, années civiles, risque</td></tr>
+      <tr><td>GET</td><td><code>/api/fonds/&lt;id&gt;/rendement-attendu/</code></td><td><code>?annees=3&amp;horizon=5&amp;capital=&amp;versement=</code></td></tr>
+      <tr><td>GET, POST</td><td><code>/api/fonds/&lt;id&gt;/actifs-nets/</code></td><td>Membres : <code>[{"date", "montant"}]</code></td></tr>
+      <tr><td>GET, POST</td><td><code>/api/fonds/&lt;id&gt;/flux/</code></td><td>Membres : <code>[{"date", "sens": "S" ou "R", "type_client", "montant"}]</code>, remplace la période envoyée</td></tr>
+      <tr><td>POST</td><td><code>/api/simulation/</code></td><td><code>{"calcul": "versement", "objectif": 10000000, "capital_initial": 0, "taux_annuel": 0.05, "duree_annees": 10}</code></td></tr>
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

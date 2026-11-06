@@ -1,0 +1,56 @@
+{% extends "fonds/base.html" %}{% load format_fr %}
+{% block titre %}Fonds{% endblock %}
+{% block contenu %}
+<div class="titre">
+  <div>
+    <h1>Fonds de {{ sgo.nom }}</h1>
+    <p class="sous-titre">{{ lignes|length }} fonds avec valeurs liquidatives{% if derniere_date %}, dernière publication le {{ derniere_date|date:"d/m/Y" }}{% endif %}.</p>
+  </div>
+  <a class="bouton" href="{% url 'simulateur' sgo.slug %}">Simuler un placement</a>
+</div>
+
+{% if encours %}
+<div class="indicateurs">
+  <div class="indicateur"><div class="libelle">Actifs nets gérés</div><div class="valeur">{{ encours|montant }}</div>
+    <div class="note">au {{ date_encours|date:"d/m/Y" }}</div></div>
+  <div class="indicateur"><div class="libelle">Fonds suivis</div><div class="valeur">{{ lignes|length }}</div>
+    <div class="note">{% if sans_vl %}+ {{ sans_vl }} sans VL{% else %}tous avec VL{% endif %}</div></div>
+</div>
+{% endif %}
+
+{% if categories|length > 1 %}
+<nav class="pastilles" aria-label="Catégories" style="margin-bottom:1rem">
+  <a href="?" class="{% if not categorie %}actif{% endif %}">Toutes</a>
+  {% for code, nom in categories %}<a href="?categorie={{ code }}" class="{% if categorie == code %}actif{% endif %}">{{ nom }}</a>{% endfor %}
+</nav>
+{% endif %}
+
+<div class="carte">
+  <div class="defile">
+  <table>
+    <thead><tr>
+      <th>Fonds</th><th>Catégorie</th><th class="n">Dernière VL</th><th class="n">Depuis le 1er janv.</th>
+      <th class="n">1 an</th><th class="n">3 ans (annualisé)</th><th class="n">Volatilité</th><th></th>
+    </tr></thead>
+    <tbody>
+    {% for l in lignes %}
+      <tr>
+        <td><a href="{{ l.fonds.get_absolute_url }}"><strong>{{ l.fonds.nom }}</strong></a></td>
+        <td>{{ l.fonds.get_categorie_display }}</td>
+        <td class="n">{{ l.vl|nombre:2 }}<br><span class="petit">{{ l.date|date:"d/m/Y" }}</span></td>
+        <td class="n {{ l.ytd|signe }}">{{ l.ytd|pct_signe }}</td>
+        <td class="n {{ l.un_an|signe }}">{{ l.un_an|pct_signe }}</td>
+        <td class="n {{ l.trois_ans|signe }}">{{ l.trois_ans|pct_signe }}</td>
+        <td class="n">{{ l.volatilite|pct }}</td>
+        <td><a href="{% url 'rendement' sgo.slug l.fonds.slug %}">Rendement attendu</a></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="8">Aucun fonds avec des valeurs liquidatives.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="petit" style="margin-top:.6rem">Rendements cumulés à la dernière VL de chaque fonds ; n.d. : historique trop court.
+    Volatilité calculée sur tout l'historique.</p>
+</div>
+{% endblock %}

@@ -1,7 +1,10 @@
-streamlit
-pandas
-numpy
-plotly
-scikit-learn
-scipy
-openpyxl
+Django>=5.2,<6
+djangorestframework>=3.15
+whitenoise>=6.6
+dj-database-url>=2.1
+psycopg[binary]>=3.1
+gunicorn>=22
+pandas>=2.0
+numpy>=1.26
+plotly>=5.20
+openpyxl>=3.1

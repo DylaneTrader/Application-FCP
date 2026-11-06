@@ -1,0 +1,77 @@
+{% load format_fr %}<div class="resultats">
+{% if erreur %}
+  <div class="alerte erreur">{{ erreur }}</div>
+{% elif r and r.mois is None %}
+  <div class="alerte erreur">Objectif hors d'atteinte en moins de 100 ans avec ce versement et ce rendement.</div>
+{% elif r %}
+<div class="indicateurs">
+  <div class="indicateur"><div class="libelle">{{ calculs|get_item:r.calcul }}</div>
+    <div class="resultat-principal">
+      {% if r.calcul == "valeur_finale" %}{{ r.valeur|montant }}
+      {% elif r.calcul == "versement" %}{{ r.versement|montant }}
+      {% elif r.calcul == "capital_initial" %}{{ r.capital|montant }}
+      {% else %}{{ annees_resultat|nombre:1 }} ans{% endif %}
+    </div>
+    <div class="note">{% if r.calcul == "duree" %}soit {{ r.mois }} mois{% else %}au taux de {{ r.taux|pct }} par an{% endif %}</div></div>
+  <div class="indicateur"><div class="libelle">Valeur finale</div><div class="valeur">{{ r.valeur|montant }}</div>
+    <div class="note">après {{ annees_resultat|nombre:1 }} ans</div></div>
+  <div class="indicateur"><div class="libelle">Montant investi</div><div class="valeur">{{ investi|montant }}</div>
+    <div class="note">capital {{ r.capital|nombre }} + {{ r.mois }} versements</div></div>
+  <div class="indicateur"><div class="libelle">Gains</div><div class="valeur {{ gains|signe }}">{{ gains|montant }}</div>
+    <div class="note">{% if investi %}{{ part_gains|pct_signe:1 }} du montant investi{% endif %}</div></div>
+  {% if valeur_reelle %}<div class="indicateur"><div class="libelle">En pouvoir d'achat actuel</div>
+    <div class="valeur">{{ valeur_reelle|montant }}</div><div class="note">inflation {{ p.inflation|nombre:1 }} % / an</div></div>{% endif %}
+</div>
+
+{% if r.calcul == "versement" %}
+<div class="carte">
+  <h2>Effort d'épargne équivalent</h2>
+  <div class="indicateurs" style="margin:0">
+    {% for nom, v in equivalents.items %}<div class="indicateur"><div class="libelle">{{ nom }}</div><div class="valeur">{{ v|montant }}</div></div>{% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="carte">
+  <h2>Évolution du placement</h2>
+  <div class="graphique" data-figure="fig-sim" role="img" aria-label="Évolution du placement"></div>
+  {{ fig|json_script:"fig-sim" }}
+</div>
+
+{% if proj %}
+<div class="carte">
+  <h2>Avec la volatilité de {{ fonds_choisi.fonds.nom }}</h2>
+  <p>Le rendement d'un fonds varie d'une année à l'autre ({{ fonds_choisi.sigma|pct }} de volatilité historique). Sur 4 000 scénarios,
+    la valeur finale serait de <strong>{{ proj.finales.q50|montant }}</strong> dans le cas médian, au moins
+    <strong>{{ proj.finales.q05|montant }}</strong> 19 fois sur 20, et inférieure au montant investi dans {{ proj.probabilite_perte|pct:0 }} des cas.
+    {% if r.objectif %}Chance d'atteindre l'objectif : <strong>{{ proj.probabilite_objectif|pct:0 }}</strong>.{% endif %}</p>
+  <a href="{% url 'rendement' sgo.slug fonds_choisi.fonds.slug %}?horizon={{ annees_resultat|stringformat:'.0f' }}&capital={{ r.capital|stringformat:'.0f' }}&versement={{ r.versement|stringformat:'.0f' }}">Voir l'éventail complet</a>
+</div>
+{% endif %}
+
+<div class="grille">
+  <div class="carte">
+    <h2>Échéancier annuel</h2>
+    <div class="defile"><table>
+      <thead><tr><th>Année</th><th class="n">Investi</th><th class="n">Gains</th><th class="n">Valeur</th></tr></thead>
+      <tbody>{% for l in annuel %}
+        <tr><td>{{ l.annee|nombre:1 }}</td><td class="n">{{ l.investi|nombre }}</td><td class="n">{{ l.interets|nombre }}</td><td class="n"><strong>{{ l.valeur|nombre }}</strong></td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  </div>
+  <div class="carte">
+    <h2>Phase de retraits</h2>
+    <p>Retrait mensuel qui épuiserait le capital constitué en {{ p.annees_retrait|stringformat:'.0f' }} ans :
+      <strong>{{ retrait_soutenable|montant }}</strong>.</p>
+    {% if fig_retraits %}
+      <div class="graphique" data-figure="fig-ret" role="img" aria-label="Épargne puis retraits"></div>
+      {{ fig_retraits|json_script:"fig-ret" }}
+      {% if epuise %}<div class="alerte erreur">Capital épuisé après {{ epuise_apres|nombre:1 }} ans de retraits de {{ p.retrait|montant }}.</div>
+      {% else %}<div class="alerte info">Il reste {{ capital_restant|montant }} après {{ p.annees_retrait|stringformat:'.0f' }} ans de retraits de {{ p.retrait|montant }}.</div>{% endif %}
+    {% else %}
+      <p class="petit">Indiquez un retrait mensuel dans « Phase de retraits » pour simuler la consommation du capital.</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+</div>

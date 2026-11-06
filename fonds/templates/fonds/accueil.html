@@ -1,0 +1,36 @@
+{% extends "fonds/base.html" %}
+{% block titre %}Sociétés de gestion{% endblock %}
+{% block contenu %}
+<div class="titre">
+  <div>
+    <h1>Sociétés de gestion d'OPCVM</h1>
+    <p class="sous-titre">Valeurs liquidatives, rendement attendu et simulateur de placement des FCP de chaque SGO.</p>
+  </div>
+</div>
+<div class="grille">
+  {% for sgo in sgos %}
+  <a class="carte sgo-carte" href="{% url 'sgo' sgo.slug %}">
+    {% if sgo.logo %}<img src="{{ sgo.logo.url }}" alt="">
+    {% elif sgo.logo_statique %}{% load static %}<img src="{% static sgo.logo_statique %}" alt="">
+    {% else %}<span class="sgo-pastille" style="background: {{ sgo.couleur_primaire }}"></span>{% endif %}
+    <span>
+      <strong>{{ sgo.nom }}</strong><br>
+      <span class="petit">{{ sgo.pays }} · {{ sgo.nombre_fonds }} fonds{% if sgo.derniere_vl %} · VL au {{ sgo.derniere_vl|date:"d/m/Y" }}{% endif %}</span>
+    </span>
+  </a>
+  {% empty %}
+  <div class="carte">
+    <h2>Aucune SGO pour l'instant</h2>
+    <p>Créez une SGO dans l'<a href="{% url 'admin:index' %}">administration</a>, puis importez ses données :</p>
+    <pre class="petit">python manage.py importer_classeur fichier.xlsx --sgo "Nom de la SGO" --creer</pre>
+    <p class="petit">Ou chargez l'exemple CGF Gestion : <code>python manage.py amorcer_demo</code>.</p>
+  </div>
+  {% endfor %}
+</div>
+<div class="carte" style="margin-top:1.1rem">
+  <h2>API</h2>
+  <p>Toute SGO peut publier ses valeurs liquidatives et lire ses données par l'API REST :
+    <a href="{% url 'api-root' %}">/api/</a>. Écriture réservée aux membres de la SGO, avec un jeton
+    (<code>POST /api/jeton/</code>). Détails sur la page <a href="{% url 'a_propos' %}#api">Méthodes</a>.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% load static %}<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titre %}Plateforme FCP{% endblock %}{% if sgo_courante %} · {{ sgo_courante.nom }}{% endif %}</title>
+  <meta name="theme-color" content="{{ couleurs.primaire }}">
+  <link rel="stylesheet" href="{% static 'fonds/app.css' %}">
+  <style>
+    :root { --primaire: {{ couleurs.primaire }}; --secondaire: {{ couleurs.secondaire }}; --accent: {{ couleurs.accent }};
+            --primaire-texte: {{ couleurs.primaire }}; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --primaire-texte: {{ couleurs.accent }}; } }
+    :root[data-theme="dark"] { --primaire-texte: {{ couleurs.accent }}; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+  <script src="{% static 'fonds/app.js' %}" defer></script>
+</head>
+<body>
+<header class="entete">
+  <div class="entete-int">
+    {% if sgo_courante %}
+      <a class="marque" href="{% url 'sgo' sgo_courante.slug %}">
+        {% if logo_sgo %}<img src="{{ logo_sgo }}" alt="{{ sgo_courante.nom }}">{% else %}{{ sgo_courante.nom }}{% endif %}
+      </a>
+    {% else %}
+      <a class="marque" href="{% url 'accueil' %}">Plateforme FCP</a>
+    {% endif %}
+    <nav class="nav" aria-label="Navigation principale">
+      {% with nom=request.resolver_match.url_name %}
+      {% if sgo_courante %}
+        <a href="{% url 'sgo' sgo_courante.slug %}" class="{% if nom == 'sgo' or nom == 'fonds' or nom == 'rendement' %}actif{% endif %}">Fonds</a>
+        <a href="{% url 'simulateur' sgo_courante.slug %}" class="{% if nom == 'simulateur' %}actif{% endif %}">Simulateur</a>
+        {% if membre_sgo %}
+          <a href="{% url 'flux' sgo_courante.slug %}" class="{% if nom == 'flux' %}actif{% endif %}">Souscriptions et rachats</a>
+          <a href="{% url 'actifs_nets' sgo_courante.slug %}" class="{% if nom == 'actifs_nets' %}actif{% endif %}">Actifs nets</a>
+        {% endif %}
+      {% endif %}
+      <a href="{% url 'accueil' %}" class="{% if nom == 'accueil' %}actif{% endif %}">Sociétés de gestion</a>
+      <a href="{% url 'a_propos' %}" class="{% if nom == 'a_propos' %}actif{% endif %}">Méthodes</a>
+      {% if user.is_authenticated %}
+        <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit">Déconnexion</button></form>
+      {% else %}
+        <a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Connexion</a>
+      {% endif %}
+      {% endwith %}
+    </nav>
+  </div>
+</header>
+<main>{% block contenu %}{% endblock %}</main>
+<footer class="pied">
+  Les performances passées ne préjugent pas des performances futures. Les projections sont des estimations
+  statistiques, sans garantie de résultat.
+</footer>
+</body>
+</html>
