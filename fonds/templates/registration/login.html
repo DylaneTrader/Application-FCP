@@ -1,0 +1,16 @@
+{% extends "fonds/base.html" %}
+{% block titre %}Connexion{% endblock %}
+{% block contenu %}
+<div class="carte" style="max-width:420px;margin:2rem auto">
+  <h1>Connexion</h1>
+  <p class="sous-titre">Espace des membres des SGO : souscriptions, rachats et actifs nets.</p>
+  {% if form.errors %}<div class="alerte erreur">Identifiant ou mot de passe incorrect.</div>{% endif %}
+  <form method="post" style="display:grid;gap:.8rem;margin-top:1rem">
+    {% csrf_token %}
+    <div><label for="id_username">Identifiant</label><input id="id_username" name="username" autocomplete="username" required autofocus></div>
+    <div><label for="id_password">Mot de passe</label><input id="id_password" name="password" type="password" autocomplete="current-password" required></div>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button class="bouton" type="submit">Se connecter</button>
+  </form>
+</div>
+{% endblock %}

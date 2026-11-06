@@ -23,5 +23,8 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Streamlit
-.streamlit/
+# Django
+db.sqlite3
+media/
+staticfiles/
+.env

@@ -1,0 +1,80 @@
+{% extends "fonds/base.html" %}{% load format_fr %}
+{% block titre %}Rendement attendu · {{ fonds.nom }}{% endblock %}
+{% block contenu %}
+<div class="fil"><a href="{% url 'sgo' sgo.slug %}">Fonds</a> › <a href="{{ fonds.get_absolute_url }}">{{ fonds.nom }}</a> › Rendement attendu</div>
+<div class="titre">
+  <div>
+    <h1>Rendement attendu</h1>
+    <p class="sous-titre">{{ fonds.nom }} : ce que l'historique des VL laisse attendre, et la fourchette de résultats sur votre horizon.</p>
+  </div>
+</div>
+
+<form class="carte filtres" method="get">
+  <div class="champ"><label for="annees">Historique retenu</label>
+    <select id="annees" name="annees">{% for code, nom in fenetres.items %}<option value="{{ code }}"{% if code == fenetre %} selected{% endif %}>{{ nom }}</option>{% endfor %}</select></div>
+  <div class="champ"><label for="horizon">Horizon (années)</label><input id="horizon" name="horizon" type="number" min="1" max="40" value="{{ horizon }}"></div>
+  <div class="champ"><label for="capital">Capital placé ({{ fonds.devise }})</label><input id="capital" name="capital" inputmode="decimal" value="{{ capital|stringformat:'.0f' }}"></div>
+  <div class="champ"><label for="versement">Versement mensuel</label><input id="versement" name="versement" inputmode="decimal" value="{{ versement|stringformat:'.0f' }}"></div>
+  <div class="champ"><label for="objectif">Objectif (facultatif)</label><input id="objectif" name="objectif" inputmode="decimal" value="{% if objectif %}{{ objectif|stringformat:'.0f' }}{% endif %}"></div>
+  <button class="bouton" type="submit">Calculer</button>
+</form>
+
+{% if not estimation %}
+  <div class="alerte info">Historique trop court sur la période choisie : il faut au moins six mois de VL. Essayez « Tout l'historique ».</div>
+{% else %}
+<div class="indicateurs">
+  <div class="indicateur"><div class="libelle">Rendement attendu (médian)</div>
+    <div class="valeur {{ estimation.taux_median|signe }}">{{ estimation.taux_median|pct_signe }}</div><div class="note">par an</div></div>
+  <div class="indicateur"><div class="libelle">Rendement moyen espéré</div>
+    <div class="valeur">{{ estimation.taux_moyen|pct_signe }}</div><div class="note">par an, espérance mathématique</div></div>
+  <div class="indicateur"><div class="libelle">Volatilité</div>
+    <div class="valeur">{{ estimation.sigma|pct }}</div><div class="note">annualisée</div></div>
+  <div class="indicateur"><div class="libelle">Risque de perte à {{ horizon }} an{{ horizon|pluralize }}</div>
+    <div class="valeur">{{ projection.probabilite_perte|pct:0 }}</div><div class="note">de finir sous le montant investi</div></div>
+  {% if objectif %}<div class="indicateur"><div class="libelle">Chance d'atteindre l'objectif</div>
+    <div class="valeur">{{ projection.probabilite_objectif|pct:0 }}</div><div class="note">{{ objectif|montant:fonds.devise }}</div></div>{% endif %}
+</div>
+
+<div class="carte">
+  <h2>Projection sur {{ horizon }} an{{ horizon|pluralize }}</h2>
+  <p class="petit">4 000 trajectoires simulées avec le rendement et la volatilité estimés ({{ estimation.debut|date:"d/m/Y" }} – {{ estimation.fin|date:"d/m/Y" }}, {{ estimation.observations }} VL).</p>
+  <div class="graphique" data-figure="fig-proj" role="img" aria-label="Éventail de projection"></div>
+  {{ fig|json_script:"fig-proj" }}
+</div>
+
+<div class="grille">
+  <div class="carte">
+    <h2>Valeur du placement selon le scénario</h2>
+    <div class="defile"><table>
+      <thead><tr><th>Année</th><th class="n">Investi</th><th class="n">Défavorable (5 %)</th><th class="n">Prudent (25 %)</th><th class="n">Médian</th><th class="n">Favorable (75 %)</th></tr></thead>
+      <tbody>{% for l in annuel %}
+        <tr><td>{{ l.annee|stringformat:'.0f' }}</td><td class="n">{{ l.investi|nombre }}</td><td class="n">{{ l.q05|nombre }}</td>
+          <td class="n">{{ l.q25|nombre }}</td><td class="n"><strong>{{ l.q50|nombre }}</strong></td><td class="n">{{ l.q75|nombre }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  </div>
+  <div class="carte">
+    <h2>Selon l'historique retenu</h2>
+    <div class="defile"><table>
+      <thead><tr><th>Historique</th><th class="n">Médian</th><th class="n">Moyen</th><th class="n">Volatilité</th></tr></thead>
+      <tbody>{% for c in comparaison %}
+        <tr{% if c.code == fenetre %} style="font-weight:600"{% endif %}><td>{{ c.nom }}</td>
+          {% if c.estimation %}<td class="n">{{ c.estimation.taux_median|pct_signe }}</td><td class="n">{{ c.estimation.taux_moyen|pct_signe }}</td><td class="n">{{ c.estimation.sigma|pct }}</td>
+          {% else %}<td class="n" colspan="3">historique insuffisant</td>{% endif %}</tr>
+      {% endfor %}</tbody>
+    </table></div>
+    {% if estimation.glissant %}
+    <h3 style="margin-top:1rem">Placements d'un an déjà réalisés</h3>
+    <p class="petit">Sur les {{ estimation.glissant.nombre }} périodes d'un an de l'historique retenu : rendement médian
+      <strong>{{ estimation.glissant.median|pct_signe }}</strong>, 8 fois sur 10 entre {{ estimation.glissant.p10|pct_signe }} et
+      {{ estimation.glissant.p90|pct_signe }} ; pire {{ estimation.glissant.pire|pct_signe }}, meilleur {{ estimation.glissant.meilleur|pct_signe }} ;
+      perte dans {{ estimation.glissant.part_negatifs|pct:0 }} des cas.</p>
+    {% endif %}
+    <a class="bouton second" href="{% url 'simulateur' sgo.slug %}?fonds={{ fonds.slug }}&capital={{ capital|stringformat:'.0f' }}&versement={{ versement|stringformat:'.0f' }}&annees={{ horizon }}">Simuler un placement avec ce fonds</a>
+  </div>
+</div>
+<p class="petit">Le rendement médian est le rendement composé observé : la moitié des scénarios font mieux. Le rendement moyen
+  est plus élevé, car quelques scénarios très favorables tirent la moyenne vers le haut. Ces estimations prolongent le passé ;
+  elles ne tiennent compte ni des frais d'entrée ou de sortie, ni d'un changement de politique de gestion.</p>
+{% endif %}
+{% endblock %}
